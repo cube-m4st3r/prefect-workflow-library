@@ -13,6 +13,11 @@ from sqlalchemy.orm import Session
 from base import Base
 from classes.yt_metadata_class import Yt_Metadata
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 @task
 def fetch_messages_from_rmq(queue_name: str, batch_size: int = 10) -> list[str]:
