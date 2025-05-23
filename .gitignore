@@ -1,4 +1,8 @@
 .env
+base.py
+cookies.txt
+classes/
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
