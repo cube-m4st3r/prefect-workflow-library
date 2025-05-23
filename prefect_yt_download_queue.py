@@ -79,8 +79,11 @@ def create_yt_metadata_instance_task(clean_data: dict):
 def store_metadata(yt_metadata: Yt_Metadata):
     from sqlalchemy.exc import SQLAlchemyError
 
-    # Use environment variables or Prefect Secret blocks
-    db_url = os.getenv("DATABASE_URL", "postgresql+psycopg2://user:pass@localhost:5432/db")
+# change to prefect secret block
+
+db_url = os.getenv("DATABASE_URL")
+if not db_url:
+    raise ValueError("DATABASE_URL environment variable is required but not set")
     engine = sa.create_engine(db_url)
     Base.metadata.create_all(engine)
 
