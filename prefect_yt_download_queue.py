@@ -23,7 +23,6 @@ load_dotenv()
 def fetch_messages_from_rmq(queue_name: str, batch_size: int = 10) -> list[str]:
     logger = get_run_logger()
     try:
-        import os
         rmq_host = os.getenv("RABBITMQ_HOST", "localhost")
         connection = pika.BlockingConnection(pika.ConnectionParameters(rmq_host))
         channel = connection.channel()
@@ -78,7 +77,6 @@ def create_yt_metadata_instance_task(clean_data: dict):
 
 @task
 def store_metadata(yt_metadata: Yt_Metadata):
-    import os
     from sqlalchemy.exc import SQLAlchemyError
 
     # Use environment variables or Prefect Secret blocks
@@ -99,7 +97,6 @@ def store_metadata(yt_metadata: Yt_Metadata):
 
 @task
 def get_info_with_ytdlp(url: str) -> dict:
-    import os
     logger = get_run_logger()
     
     cookie_file = os.getenv("YT_COOKIE_FILE", "cookies.txt")
@@ -120,7 +117,6 @@ def get_info_with_ytdlp(url: str) -> dict:
 
 @task
 def download_with_ytdlp(url: str):
-    import os
     logger = get_run_logger()
     
     cookie_file = os.getenv("YT_COOKIE_FILE", "cookies.txt")
