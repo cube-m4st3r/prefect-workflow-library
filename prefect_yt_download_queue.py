@@ -204,18 +204,26 @@ def yt_processing_flow(queue_name: str = "yt_download_requests"):
 
     logger.info(f"Found {len(messages)} videos in the queue.")
 
+    count_succ_links = 0
+    count_unsucc_links = 0
+
     all_results = []
     for url in messages:
         try:
             validate_index_subflow(url=url)
         except Exception as e:
             logger.warning(f"Skipping failed task for URL: {url} due to error: {e}")
+            count_unsucc_links += 1
             continue
 
         logger.info(f"Successfully processed {url}")
+        count_succ_links += 1
         all_results.append(url)
 
-    logger.info(f"Processing of {len(messages)} video(s) complete.")
+    if count_succ_links == 0:
+        logger.error(f"Unable to process any videos. Failed to process a total of: {len(messages)}")
+        return Failed(message=f"Unable to process any videos. Failed to process a total of: {len(messages)}.")
+    logger.info(f"Processing of {len(messages)} video(s) complete. Failed to download {count_unsucc_links}.")
 
 
 if __name__ == "__main__":
