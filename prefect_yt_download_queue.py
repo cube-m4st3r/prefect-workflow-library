@@ -93,6 +93,7 @@ def store_metadata(yt_metadata: Yt_Metadata):
     try:
         with Session(engine) as session:
             session.add(yt_metadata)
+            session.expire_on_commit = False
             session.commit()
         logger.info("Successfully stored data into DB.")
     except SQLAlchemyError as e:
@@ -130,10 +131,11 @@ def download_with_ytdlp(url: str):
     os.makedirs(download_dir, exist_ok=True)
     
     ydl_opts = {
-        "format": "bestvideo+bestaudio/best",
+        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]",
+        "merge_output_format": "mp4",
         "outtmpl": os.path.join(download_dir, "%(title).100s_%(id)s.%(ext)s"),
-        "restrictfilenames": True,  # sanitize filenames
-        "windowsfilenames": True    # extra safety for cross-platform
+        "restrictfilenames": True, # sanitize filenames
+        "windowsfilenames": True   # extra safety for cross-platform
     }
     
     if os.path.exists(cookie_file):
