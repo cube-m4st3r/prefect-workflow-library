@@ -158,15 +158,18 @@ def store_video_metadata_subflow(info: dict):
     yt_metadata_instance = create_yt_metadata_instance_task(clean_data=clean_data)
     store_metadata(yt_metadata=yt_metadata_instance)
 
+    return yt_metadata_instance
+
 @flow
-def download_video_subflow(url: str, info: dict):
+def download_video_subflow(url: str, yt_metadata_instance: Yt_Metadata):
+
     logger = get_run_logger()
     try:
         download_with_ytdlp(url)
     except Exception as e:
-        logger.error(f"Download failed for {info['title']} {url}: {e}")
+        logger.error(f"Download failed for {yt_metadata_instance.title} {url}: {e}")
         raise Failed(message=f"Download failed: {e}")
-    logger.info(f"Finished downloading video: {info['title']}")
+    logger.info(f"Finished downloading video: {yt_metadata_instance.title}")
 
 
 @flow
@@ -184,9 +187,9 @@ def validate_index_subflow(url: str):
     info = info_state.result()
     logger.info(f"Processing video: {info['title']}")
 
-    store_video_metadata_subflow(info=info)
+    yt_metadata_instance = store_video_metadata_subflow(info=info)
 
-    download_state = download_video_subflow(url=url, info=info, return_state=True)
+    download_state = download_video_subflow(url=url, yt_metadata_instance=yt_metadata_instance, return_state=True)
     if download_state.is_failed():
         raise RuntimeError(f"Download failed for {info['title']} {url}")
 
