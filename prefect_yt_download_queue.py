@@ -81,9 +81,10 @@ def store_metadata(yt_metadata: Yt_Metadata):
 
 # change to prefect secret block
 
-db_url = os.getenv("DATABASE_URL")
-if not db_url:
-    raise ValueError("DATABASE_URL environment variable is required but not set")
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
+        raise ValueError("DATABASE_URL environment variable is required but not set")
+
     engine = sa.create_engine(db_url)
     Base.metadata.create_all(engine)
 
