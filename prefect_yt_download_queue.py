@@ -9,6 +9,7 @@ from prefect.logging import get_run_logger
 from prefect.states import Cancelled, Failed
 from prefect.tasks import task_input_hash
 from sqlalchemy.orm import Session
+import requests
 
 from base import Base
 from classes.yt_metadata_class import Yt_Metadata
@@ -44,6 +45,24 @@ def fetch_messages_from_rmq(queue_name: str, batch_size: int = 10) -> list[str]:
         connection.close()
     
     return messages
+
+@task
+def send_notification_to_ntfy_task(data: str):
+    logger = get_run_logger()
+    
+    ntfy_url = os.getenv("NTFY_URL", "https://ntfy.cubemaster.de/yt_downloads_prefect")
+    
+    if not data or not isinstance(data, str):
+        logger.warning("Invalid notification data provided")
+        return
+    
+    try:
+        response = requests.post(ntfy_url, data=data, timeout=10)
+        response.raise_for_status()
+        logger.info(f"Notification sent successfully: {response.status_code}")
+    except requests.RequestException as e:
+        logger.warning(f"Failed to send notification: {e}")
+        # Don't raise the exception to avoid failing the entire flow
 
 
 @task
@@ -230,6 +249,8 @@ def yt_processing_flow(queue_name: str = "yt_download_requests"):
         logger.error(f"Unable to process any videos. Failed to process a total of: {len(messages)}")
         return Failed(message=f"Unable to process any videos. Failed to process a total of: {len(messages)}.")
     logger.info(f"Processing of {len(messages)} video(s) complete. Failed to download {count_unsucc_links}.")
+
+    send_notification_to_ntfy_task(data=f"Processing of {len(messages)} video(s) complete. Failed to download {count_unsucc_links}.")
 
 
 if __name__ == "__main__":
