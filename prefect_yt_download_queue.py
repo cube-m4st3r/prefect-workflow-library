@@ -10,6 +10,7 @@ from prefect.states import Cancelled, Failed
 from prefect.tasks import task_input_hash
 from sqlalchemy.orm import Session
 import requests
+from requests.auth import HTTPBasicAuth
 
 from base import Base
 from classes.yt_metadata_class import Yt_Metadata
@@ -25,7 +26,8 @@ def fetch_messages_from_rmq(queue_name: str, batch_size: int = 10) -> list[str]:
     logger = get_run_logger()
     try:
         rmq_host = os.getenv("RABBITMQ_HOST", "localhost")
-        connection = pika.BlockingConnection(pika.ConnectionParameters(rmq_host))
+        rmq_port = os.getenv("RABBITMQ_PORT", "")
+        connection = pika.BlockingConnection(pika.ConnectionParameters(host=rmq_host, port=rmq_port))
         channel = connection.channel()
     except Exception as e:
         logger.error(f"Failed to connect to RabbitMQ: {e}")
@@ -50,14 +52,15 @@ def fetch_messages_from_rmq(queue_name: str, batch_size: int = 10) -> list[str]:
 def send_notification_to_ntfy_task(data: str):
     logger = get_run_logger()
     
-    ntfy_url = os.getenv("NTFY_URL", "https://ntfy.cubemaster.de/yt_downloads_prefect")
+    ntfy_url = os.getenv("NTFY_URL")
     
     if not data or not isinstance(data, str):
         logger.warning("Invalid notification data provided")
         return
     
     try:
-        response = requests.post(ntfy_url, data=data, timeout=10)
+        auth = HTTPBasicAuth(username=os.getenv("HTTPBASICAUTH_USER"), password=os.getenv("HTTPBASICAUTH_PASSWORD"))
+        response = requests.post(f"{ntfy_url}/yt_downloads_prefect", data=data, timeout=10, auth=auth)
         response.raise_for_status()
         logger.info(f"Notification sent successfully: {response.status_code}")
     except requests.RequestException as e:
