@@ -8,6 +8,7 @@ from prefect import flow, task
 from prefect.logging import get_run_logger
 from prefect.states import Cancelled, Failed
 from prefect.tasks import task_input_hash
+from prefect.blocks.system import Secret
 from prefect_sqlalchemy import SqlAlchemyConnector
 from sqlalchemy.orm import Session
 import requests
@@ -21,13 +22,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+env_block = Secret.load("spheredefaultenv")
+env_data = env_block.get()
 
 @task
 def fetch_messages_from_rmq(queue_name: str, batch_size: int = 10) -> list[str]:
     logger = get_run_logger()
     try:
-        rmq_host = os.getenv("RABBITMQ_HOST", "localhost")
-        rmq_port = os.getenv("RABBITMQ_PORT", "")
+        rmq_host = env_data["RABBITMQ_HOST"]
+        rmq_port = env_data["RABBITMQ_PORT"]
         connection = pika.BlockingConnection(pika.ConnectionParameters(host=rmq_host, port=rmq_port))
         channel = connection.channel()
     except Exception as e:
@@ -52,14 +55,14 @@ def fetch_messages_from_rmq(queue_name: str, batch_size: int = 10) -> list[str]:
 @task
 def send_notification_to_ntfy_task(video_data: str):
     logger = get_run_logger()
-    ntfy_url = os.getenv("NTFY_URL")
+    ntfy_url = env_data["NTFY_URL"]
 
     if not isinstance(video_data, str):
         logger.warning("Invalid notification data provided")
         return
 
     try:
-        auth = HTTPBasicAuth(username=os.getenv("HTTPBASICAUTH_USER"), password=os.getenv("HTTPBASICAUTH_PASSWORD"))
+        auth = HTTPBasicAuth(username=env_data["HTTPBASICAUTH_USER"], password=env_data["HTTPBASICAUTH_PASSWORD"])
         response = requests.post(f"{ntfy_url}/yt_downloads_prefect", data=video_data, headers={ "Title": "YoutTube Download(s) finished ✔".encode('utf-8') }, timeout=10, auth=auth)
         response.raise_for_status()
         logger.info(f"Notification sent successfully: {response.status_code}")
@@ -100,12 +103,6 @@ def create_yt_metadata_instance_task(clean_data: dict):
 def store_metadata(yt_metadata: Yt_Metadata):
     from sqlalchemy.exc import SQLAlchemyError
 
-# change to prefect secret block
-
-    # db_url = os.getenv("DATABASE_URL")
-    # if not db_url:
-    #     raise ValueError("DATABASE_URL environment variable is required but not set")
-
     connector = SqlAlchemyConnector.load("spheredefaultcreds")
 
     engine = connector.get_engine()
@@ -127,7 +124,7 @@ def store_metadata(yt_metadata: Yt_Metadata):
 def get_info_with_ytdlp(url: str) -> dict:
     logger = get_run_logger()
     
-    cookie_file = os.getenv("YT_COOKIE_FILE", "cookies.txt")
+    cookie_file = env_data["YT_COOKIE_FILE"]
     ydl_opts = {"quiet": True, "skip_download": True}
     
     if os.path.exists(cookie_file):
@@ -147,8 +144,8 @@ def get_info_with_ytdlp(url: str) -> dict:
 def download_with_ytdlp(url: str):
     logger = get_run_logger()
     
-    cookie_file = os.getenv("YT_COOKIE_FILE", "cookies.txt")
-    download_dir = os.getenv("YT_DOWNLOAD_DIR", "./downloads")
+    cookie_file = env_data["YT_COOKIE_FILE"]
+    download_dir = env_data["YT_DOWNLOAD_DIR"]
     
     
     os.makedirs(download_dir, exist_ok=True)
