@@ -8,8 +8,10 @@ from prefect import flow, task
 from prefect.logging import get_run_logger
 from prefect.states import Cancelled, Failed
 from prefect.tasks import task_input_hash
+from prefect.blocks.notifications import DiscordWebhook
 from prefect.blocks.system import Secret
 from prefect_sqlalchemy import SqlAlchemyConnector
+
 from sqlalchemy.orm import Session
 import requests
 from requests.auth import HTTPBasicAuth
@@ -249,7 +251,10 @@ def yt_processing_flow(queue_name: str = "yt_download_requests"):
         return Failed(message=f"Unable to process any videos. Failed to process a total of: {len(messages)}.")
     logger.info(f"Processing of {len(messages)} video(s) complete. Failed to download {count_unsucc_links}.")
 
+    discord_webhook_block = DiscordWebhook.load("workflowhasfinished")
+
     send_notification_to_ntfy_task(video_data=f"Processing of {len(messages)} video(s) complete. Failed to download {count_unsucc_links}.")
+    discord_webhook_block.notify(f"Finished downloading: {len(messages)} youtube videos.")
 
 
 if __name__ == "__main__":
