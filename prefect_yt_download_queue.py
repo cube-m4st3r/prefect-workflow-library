@@ -50,23 +50,21 @@ def fetch_messages_from_rmq(queue_name: str, batch_size: int = 10) -> list[str]:
     return messages
 
 @task
-def send_notification_to_ntfy_task(data: str):
+def send_notification_to_ntfy_task(video_data: str):
     logger = get_run_logger()
-    
     ntfy_url = os.getenv("NTFY_URL")
-    
-    if not data or not isinstance(data, str):
+
+    if not isinstance(video_data, str):
         logger.warning("Invalid notification data provided")
         return
-    
+
     try:
         auth = HTTPBasicAuth(username=os.getenv("HTTPBASICAUTH_USER"), password=os.getenv("HTTPBASICAUTH_PASSWORD"))
-        response = requests.post(f"{ntfy_url}/yt_downloads_prefect", data=data, timeout=10, auth=auth)
+        response = requests.post(f"{ntfy_url}/yt_downloads_prefect", data=video_data, headers={ "Title": "YoutTube Download(s) finished ✔".encode('utf-8') }, timeout=10, auth=auth)
         response.raise_for_status()
         logger.info(f"Notification sent successfully: {response.status_code}")
     except requests.RequestException as e:
         logger.warning(f"Failed to send notification: {e}")
-        # Don't raise the exception to avoid failing the entire flow
 
 
 @task
@@ -120,10 +118,10 @@ def store_metadata(yt_metadata: Yt_Metadata):
             session.add(yt_metadata)
             session.expire_on_commit = False
             session.commit()
-        logger.info("Successfully stored data into DB.")
+        logger.info(f"Successfully stored data for {yt_metadata.title} into DB.")
     except SQLAlchemyError as e:
         logger.error(f"Database operation failed: {e}")
-        raise Failed(f"Failed to store metadata: {e}")
+        raise Failed(f"Failed to store metadata for {yt_metadata.title}: {e}")
 
 @task
 def get_info_with_ytdlp(url: str) -> dict:
@@ -221,8 +219,6 @@ def validate_index_subflow(url: str):
     if download_state.is_failed():
         raise RuntimeError(f"Download failed for {info['title']} {url}")
 
-    return info
-
 
 @flow
 def yt_processing_flow(queue_name: str = "yt_download_requests"):
@@ -256,7 +252,7 @@ def yt_processing_flow(queue_name: str = "yt_download_requests"):
         return Failed(message=f"Unable to process any videos. Failed to process a total of: {len(messages)}.")
     logger.info(f"Processing of {len(messages)} video(s) complete. Failed to download {count_unsucc_links}.")
 
-    send_notification_to_ntfy_task(data=f"Processing of {len(messages)} video(s) complete. Failed to download {count_unsucc_links}.")
+    send_notification_to_ntfy_task(video_data=f"Processing of {len(messages)} video(s) complete. Failed to download {count_unsucc_links}.")
 
 
 if __name__ == "__main__":
