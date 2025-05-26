@@ -8,6 +8,7 @@ from prefect import flow, task
 from prefect.logging import get_run_logger
 from prefect.states import Cancelled, Failed
 from prefect.tasks import task_input_hash
+from prefect_sqlalchemy import SqlAlchemyConnector
 from sqlalchemy.orm import Session
 import requests
 from requests.auth import HTTPBasicAuth
