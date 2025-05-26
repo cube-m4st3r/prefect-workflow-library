@@ -103,15 +103,17 @@ def store_metadata(yt_metadata: Yt_Metadata):
 
 # change to prefect secret block
 
-    db_url = os.getenv("DATABASE_URL")
-    if not db_url:
-        raise ValueError("DATABASE_URL environment variable is required but not set")
+    # db_url = os.getenv("DATABASE_URL")
+    # if not db_url:
+    #     raise ValueError("DATABASE_URL environment variable is required but not set")
 
-    engine = sa.create_engine(db_url)
+    connector = SqlAlchemyConnector.load("spheredefaultcreds")
+
+    engine = connector.get_engine()
     Base.metadata.create_all(engine)
 
     logger = get_run_logger()
-
+        
     try:
         with Session(engine) as session:
             session.add(yt_metadata)
