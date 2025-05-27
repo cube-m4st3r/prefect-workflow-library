@@ -9,6 +9,7 @@ import requests
 from prefect.blocks.system import Secret
 from datetime import datetime
 
+from requests.auth import HTTPBasicAuth
 from classes.apod_class import Apod
 from base import Base
 
@@ -24,6 +25,26 @@ params = {
     "api_key": api_key
 }
 
+
+@task
+def send_notification_to_ntfy_task(data: str):
+    logger = get_run_logger()
+    
+    ntfy_url = env_data["NTFY_URL"]
+    
+    if not data or not isinstance(data, str):
+        logger.warning("Invalid notification data provided")
+        return
+    
+    try:
+        auth = HTTPBasicAuth(username=env_data["HTTPBASICAUTH_USER"], password=env_data["HTTPBASICAUTH_PASSWORD"])
+        response = requests.post(f"{ntfy_url}/nasa_apod_prefect", data=data, timeout=10, auth=auth)
+        response.raise_for_status()
+        logger.info(f"Notification sent successfully: {response.status_code}")
+    except requests.RequestException as e:
+        logger.warning(f"Failed to send notification: {e}")
+        return Cancelled(message=f"Failed to send notification: {e}")
+        
 
 @task
 def api_request_task():
