@@ -7,6 +7,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 import requests
 from prefect.blocks.system import Secret
+from prefect_sqlalchemy import SqlAlchemyConnector
 from datetime import datetime
 
 from requests.auth import HTTPBasicAuth
@@ -101,6 +102,7 @@ def store_apod_data_task(apod: Apod):
             raise ValueError(f"APOD data already exists for this date: {apod.date}")
                     
         session.add(apod)
+        session.expire_on_commit = False
         session.commit()
 
     logger.info("Successfully stored data into DB.")
