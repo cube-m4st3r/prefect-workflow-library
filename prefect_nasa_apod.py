@@ -1,16 +1,16 @@
-import prefect
 from prefect import flow, task
-import prefect.context
 from prefect.states import Cancelled
 from prefect.logging import get_run_logger
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 import requests
 from prefect.blocks.system import Secret
+from prefect.blocks.notifications import DiscordWebhook
 from prefect_sqlalchemy import SqlAlchemyConnector
 from datetime import datetime
 
 from requests.auth import HTTPBasicAuth
+
 from classes.apod_class import Apod
 from base import Base
 
@@ -116,7 +116,9 @@ def get_apod_flow():
     
     store_apod_data_task(apod_instance)
     
-    print(prefect.context.get_run_context().flow_run.id)
+    send_notification_to_ntfy_task(data=f"Added APOD post: {apod_instance.title} for {apod_instance.date}")
+    discord_webhook_block = DiscordWebhook.load("workflowhasfinished")
+    discord_webhook_block.notify(f"Added APOD post: {apod_instance.title} for {apod_instance.date}")
 
 
 if __name__ == "__main__":
