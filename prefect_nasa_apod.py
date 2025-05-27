@@ -6,14 +6,17 @@ from prefect.logging import get_run_logger
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 import requests
+from prefect.blocks.system import Secret
 from datetime import datetime
 
 from classes.apod_class import Apod
 from base import Base
 
-import os
+env_block = Secret.load("spheredefaultenv")
+env_data = env_block.get()
 
-api_key = os.getenv("NASA_API_KEY")
+
+api_key = env_data["NASA_API_KEY"]
 if not api_key:
     raise ValueError("NASA_API_KEY environment variable is not set")
 url = "https://api.nasa.gov/planetary/apod"
@@ -63,9 +66,9 @@ def create_apod_instance_task(clean_data: dict):
 
 @task
 def store_apod_data_task(apod: Apod):
-    import os
-    db_url = os.getenv("DATABASE_URL", "postgresql+psycopg2://user:pass@localhost:5432/db")
-    engine = sa.create_engine(db_url)
+    
+    connector = SqlAlchemyConnector.load("spheredefaultcreds")
+    engine = connector.get_engine()
     Base.metadata.create_all(engine)
 
     logger = get_run_logger()
