@@ -10,7 +10,7 @@ from prefect_sqlalchemy import SqlAlchemyConnector
 from datetime import datetime
 from discord import Embed
 from utils.image_manipulation import image_manipulation as IM
-
+from handlers.loki_logging import get_logger
 import httpx
 from requests.auth import HTTPBasicAuth
 
@@ -29,6 +29,11 @@ params = {
     "api_key": api_key
 }
 
+loki_logger = get_logger(
+    "prefect_nasa_apod",
+    level="debug",
+    labels={"sphere_automation": "prefect_nasa_apod", "env": "dev"}
+)
 
 @task
 def send_notification_to_ntfy_task(apod: Apod):
@@ -47,8 +52,10 @@ def send_notification_to_ntfy_task(apod: Apod):
         response = requests.post(f"{ntfy_url}/nasa_apod_prefect", data=data, timeout=10, auth=auth)
         response.raise_for_status()
         logger.info(f"Notification sent successfully: {response.status_code}")
+        loki_logger.info(f"Notification sent successfully: {response.status_code}")
     except requests.RequestException as e:
         logger.warning(f"Failed to send notification: {e}")
+        loki_logger.warning(f"Failed to send notification: {e}")
         return Cancelled(message=f"Failed to send notification: {e}")
 
 @task
@@ -75,6 +82,7 @@ def create_embed_task(apod: Apod):
         #apod_embed.color = int(hex_color.replace("#", ""), 16)
         
         logger.info(f"Created APOD Embed")
+        loki_logger.info(f"Created APOD Embed")
         
         return apod_embed.to_dict()
 
@@ -100,6 +108,7 @@ def post_apod_embed(embed: Embed):
     response.raise_for_status() 
     
     logger.info("Successfully sent APOD Embed notification via webhook")
+    loki_logger.info("Successfully sent APOD Embed notification via webhook")
     
 
 @task
@@ -111,6 +120,7 @@ def api_request_task():
         return response.json()
     except requests.RequestException as e:
         logger.error(f"API request failed: {e}")
+        loki_logger.error(f"API request failed: {e}")
         raise
 
 
@@ -154,6 +164,7 @@ def store_apod_data_task(apod: Apod):
         logger.info(f"checking if dataset for date: '{apod.date}' exists in database")
         if session.query(Apod).filter(Apod.date == apod.date).first():
             logger.info(f"APOD for date {apod.date} already exists in DB.")
+            loki_logger.info(f"APOD for date {apod.date} already exists in DB.")
             raise ValueError(f"APOD data already exists for this date: {apod.date}")
                     
         session.add(apod)
@@ -161,6 +172,7 @@ def store_apod_data_task(apod: Apod):
         session.commit()
 
     logger.info("Successfully stored data into DB.")
+    loki_logger.info("Successfully stored data into DB.")
 
 
 @task
@@ -170,6 +182,7 @@ def send_discord_notification_task(apod: Apod):
     discord_webhook_block.notify(f"`[APOD] Data processed: '{apod.title}' | {apod.date}`")
     
     logger.info("Successfully sent workflow-finished notification via webhook")
+    loki_logger.info("Successfully sent workflow-finished notification via webhook")
 
 
 @flow(name="Post APOD data")
