@@ -2,7 +2,6 @@ import re
 from datetime import datetime
 
 import pika
-import sqlalchemy as sa
 import yt_dlp
 from prefect import flow, task
 from prefect.logging import get_run_logger
@@ -65,7 +64,13 @@ def send_notification_to_ntfy_task(video_data: str):
 
     try:
         auth = HTTPBasicAuth(username=env_data["HTTPBASICAUTH_USER"], password=env_data["HTTPBASICAUTH_PASSWORD"])
-        response = requests.post(f"{ntfy_url}/yt_downloads_prefect", data=video_data, headers={ "Title": "YoutTube Download(s) finished ✔".encode('utf-8') }, timeout=10, auth=auth)
+        response = requests.post(
+            f"{ntfy_url}/yt_downloads_prefect",
+            data=video_data,
+            headers={"Title": "YouTube Download(s) finished ✔"},
+            timeout=10,
+            auth=auth
+        )
         response.raise_for_status()
         logger.info(f"Notification sent successfully: {response.status_code}")
     except requests.RequestException as e:
