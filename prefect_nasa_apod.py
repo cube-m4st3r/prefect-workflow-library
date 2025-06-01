@@ -8,7 +8,10 @@ from prefect.blocks.system import Secret
 from prefect.blocks.notifications import DiscordWebhook
 from prefect_sqlalchemy import SqlAlchemyConnector
 from datetime import datetime
+from discord import Embed
+from utils.image_manipulation import image_manipulation as IM
 
+import httpx
 from requests.auth import HTTPBasicAuth
 
 from classes.apod_class import Apod
@@ -28,10 +31,12 @@ params = {
 
 
 @task
-def send_notification_to_ntfy_task(data: str):
+def send_notification_to_ntfy_task(apod: Apod):
     logger = get_run_logger()
     
     ntfy_url = env_data["NTFY_URL"]
+    
+    data=f"Added APOD post: {apod.title} for {apod.date}"
     
     if not data or not isinstance(data, str):
         logger.warning("Invalid notification data provided")
@@ -45,7 +50,57 @@ def send_notification_to_ntfy_task(data: str):
     except requests.RequestException as e:
         logger.warning(f"Failed to send notification: {e}")
         return Cancelled(message=f"Failed to send notification: {e}")
+
+@task
+def create_embed_task(apod: Apod):
+    """Task to create the APOD embed"""
+    """
+        Notes: need to fix the image loading, discord is having trouble to fetch the data from the original nasa.gov url
+                other than that, the data is being displayed correctly.
+    """
+    logger = get_run_logger()
+    try:
+        apod_embed = Embed()
         
+        #image_data = apod.url.read()
+        
+        #hex_color = IM._get_highest_frequency_color_hex(image_data=image_data)
+        
+        apod_embed.title = apod.title
+        apod_embed.description = apod.explanation
+        if apod.copyright:
+            apod_embed.set_footer(text=f"Copyright: {apod.copyright} | {apod.date}")
+        apod_embed.set_footer(text=f"{apod.date}")
+        #apod_embed.set_image(url="https://apod.nasa.gov/apod/image/2505/RhoZeta_Nowak_2560.jpg")
+        #apod_embed.color = int(hex_color.replace("#", ""), 16)
+        
+        logger.info(f"Created APOD Embed")
+        
+        return apod_embed.to_dict()
+
+    except Exception as e:
+        logger.error(f"An unexpected error occurred: {e}")
+        return None
+    
+    
+@task
+def post_apod_embed(embed: Embed):
+    logger = get_run_logger()
+    # discord_webhook_block = DiscordWebhook.load("nasaapodpost")
+    # discord_webhook_block.notify(embed=embed)
+    
+    webhook_url = "https://discord.com/api/webhooks/1378686035856457778/RLpRNUWM9rjtBsMlB3seK-eNezoElYv1bTw_CFun1g8ocucN3oOrolgkzCKd0vt-BUgd"
+    
+    payload = {
+        "username": "NASA APOD POST",
+        "embeds": [embed]
+    }
+    
+    response = httpx.post(webhook_url, json=payload)
+    response.raise_for_status() 
+    
+    logger.info("Successfully sent APOD Embed notification via webhook")
+    
 
 @task
 def api_request_task():
@@ -108,6 +163,27 @@ def store_apod_data_task(apod: Apod):
     logger.info("Successfully stored data into DB.")
 
 
+@task
+def send_discord_notification_task(apod: Apod):
+    logger = get_run_logger()
+    discord_webhook_block = DiscordWebhook.load("workflowhasfinished")
+    discord_webhook_block.notify(f"`[APOD] Data processed: '{apod.title}' | {apod.date}`")
+    
+    logger.info("Successfully sent workflow-finished notification via webhook")
+
+
+@flow(name="Post APOD data")
+def post_apod_data_flow(apod: Apod):
+    embed = create_embed_task(apod=apod)
+    post_apod_embed(embed=embed)
+
+
+@flow(name="Send out notifications")
+def send_out_notifications_flow(apod: Apod):
+    send_notification_to_ntfy_task(apod=apod)
+    send_discord_notification_task(apod=apod)
+
+
 @flow(name="Get NASA APOD and Store in DB")
 def get_apod_flow():
     raw_data = api_request_task()
@@ -116,9 +192,8 @@ def get_apod_flow():
     
     store_apod_data_task(apod_instance)
     
-    send_notification_to_ntfy_task(data=f"Added APOD post: {apod_instance.title} for {apod_instance.date}")
-    discord_webhook_block = DiscordWebhook.load("workflowhasfinished")
-    discord_webhook_block.notify(f"Added APOD post: {apod_instance.title} for {apod_instance.date}")
+    send_out_notifications_flow(apod=apod_instance)
+    post_apod_data_flow(apod=apod_instance)
 
 
 if __name__ == "__main__":
