@@ -30,9 +30,15 @@ params = {
 }
 
 loki_logger = get_logger(
-    "prefect_nasa_apod",
+    "sphere.automation.prefect",
     level="debug",
-    labels={"sphere_automation": "prefect_nasa_apod", "env": "dev"}
+    labels={
+        "app": "sphere",
+        "env": "dev",
+        "service": "prefect",
+        "lang": "python",
+        "script": "prefect_nasa_apod.py"
+    }
 )
 
 @task
@@ -53,6 +59,7 @@ def send_notification_to_ntfy_task(apod: Apod):
         response.raise_for_status()
         logger.info(f"Notification sent successfully: {response.status_code}")
         loki_logger.info(f"Notification sent successfully: {response.status_code}")
+        
     except requests.RequestException as e:
         logger.warning(f"Failed to send notification: {e}")
         loki_logger.warning(f"Failed to send notification: {e}")
@@ -88,6 +95,7 @@ def create_embed_task(apod: Apod):
 
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}")
+        loki_logger.error(f"An unexpected error occurred: {e}")
         return None
     
     
@@ -117,6 +125,8 @@ def api_request_task():
     try:
         response = requests.get(url, params=params)
         response.raise_for_status()
+        logger.info(f"API request was successful. Status code: {response.status_code}")
+        loki_logger.info(f"API request was successful. Status code: {response.status_code}")
         return response.json()
     except requests.RequestException as e:
         logger.error(f"API request failed: {e}")
@@ -126,6 +136,7 @@ def api_request_task():
 
 @task
 def transform_apod_data_task(raw_data: dict) -> dict:
+    logger = get_run_logger()
     transformed = {
         "title": raw_data.get("title", "Untitled").strip(),
         "explanation": raw_data.get("explanation", "").strip()[:1000],
@@ -142,6 +153,9 @@ def transform_apod_data_task(raw_data: dict) -> dict:
         transformed["date"] = date_obj.strftime("%Y-%m-%d")
     except ValueError:
         transformed["date"] = "1970-01-01"
+
+    logger.info(f"Successfully transformed data.")
+    loki_logger.info(f"Successfully transformed data.")
 
     return transformed
 
