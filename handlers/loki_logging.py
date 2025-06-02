@@ -4,6 +4,7 @@ import json
 import threading
 import requests
 from prefect.variables import Variable
+from .filters import ContextFilter
 
 loki_json = Variable.get("lokiapiurl")
 
@@ -23,6 +24,7 @@ class LokiHandler(logging.Handler):
             stream = {
                 "stream": {
                     **self.labels,
+                    **getattr(record, "tags", {}),
                     "level": record.levelname.lower(),
                     "logger": record.name
                 },
@@ -41,6 +43,7 @@ class LokiHandler(logging.Handler):
 
         except Exception:
             self.handleError(record)
+
 
 
 def get_logger(
@@ -62,6 +65,8 @@ def get_logger(
             "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
         )
         handler.setFormatter(formatter)
+
+        handler.addFilter(ContextFilter())
 
         logger.addHandler(handler)
 
