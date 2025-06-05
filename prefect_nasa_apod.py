@@ -105,7 +105,7 @@ def post_apod_embed(embed: Embed):
     # discord_webhook_block = DiscordWebhook.load("nasaapodpost")
     # discord_webhook_block.notify(embed=embed)
     
-    webhook_url = "https://discord.com/api/webhooks/1378686035856457778/RLpRNUWM9rjtBsMlB3seK-eNezoElYv1bTw_CFun1g8ocucN3oOrolgkzCKd0vt-BUgd"
+    webhook_url = ""
     
     payload = {
         "username": "NASA APOD POST",
